@@ -102,7 +102,13 @@ def process(source):
     ts = 0
     files = []
 
-    for bag_path in sorted(glob.glob(source + '/*.db3'), key=os.path.getmtime, reverse=False):
+    if os.path.splitext(source)[1] == ".db3":
+      bag_paths  = [source]
+    else:
+      bag_paths = sorted(
+          glob.glob(source + '/*.db3'), key=os.path.getmtime, reverse=False)
+
+    for bag_path in bag_paths:
       files.append(os.path.basename(bag_path))
 
       storage_options, converter_options = get_rosbag_options(bag_path)
