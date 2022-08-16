@@ -48,7 +48,7 @@ def write_topic(f, type_map, topic, data, ts):
     return
 
   # Create timestamp
-  date = '\'{}.{}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
+  date = '\'{}.{:0>9}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
 
   # Deserialize topic
   msg_type = get_message(type_map[topic])
