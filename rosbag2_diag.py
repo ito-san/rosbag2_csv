@@ -79,11 +79,19 @@ def write_topic(f, type_map, topic, data, ts):
 
   elif topic == '/system/emergency/hazard_status':
     lf_value = ""
-    for lf in msg.status.diagnostics_lf:
-      lf_value += '{}|{}|'.format(lf.level, lf.name, lf.message)
     spf_value = ""
-    for spf in msg.status.diagnostics_spf:
-      spf_value += '{}|{}|'.format(spf.level, spf.name, spf.message)
+    if type_map[topic] == 'autoware_auto_system_msgs/msg/HazardStatusStamped':
+      #for Autoware.universe
+      for lf in msg.status.diag_latent_fault:
+        lf_value += '{}|{}|'.format(lf.level, lf.name, lf.message)
+      for spf in msg.status.diag_single_point_fault:
+        spf_value += '{}|{}|'.format(spf.level, spf.name, spf.message)
+    else:
+      #for Autoware.IV
+      for lf in msg.status.diagnostics_lf:
+        lf_value += '{}|{}|'.format(lf.level, lf.name, lf.message)
+      for spf in msg.status.diagnostics_spf:
+        spf_value += '{}|{}|'.format(spf.level, spf.name, spf.message)
 
     f.write(',{},{},{},LF={},SPF={}\n'.format(date, topic, msg.status.level, lf_value, spf_value))
 
