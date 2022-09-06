@@ -26,6 +26,7 @@ import rosbag2_py  # noqa
 
 argvs = sys.argv
 argc = len(argvs)
+filter = None
 
 
 def get_rosbag_options(path, serialization_format='cdr'):
@@ -61,9 +62,14 @@ def write_topic(f, type_map, topic, data, ts):
 
   if topic == '/diagnostics':
     for status in msg.status:
+      # Filter by name
+      if filter is not None:
+        if status.name.startswith(filter) == False:
+          continue
+
       level = int.from_bytes(status.level, 'big')
       key_value = ""
-      # Append diagnotic array
+      # Append diagnostic array
       for value in status.values:
         key_value += '{},{},'.format(value.key, value.value)
 
@@ -106,7 +112,11 @@ def write_topic(f, type_map, topic, data, ts):
 
 def process(source):
 
-  path = datetime.datetime.now().strftime('rosbag_%Y%m%d-%H%M%S.csv')
+  path = datetime.datetime.now().strftime('rosbag_%Y%m%d-%H%M%S')
+  if filter is not None:
+    path = path + "_" + filter
+  path = path + '.csv'
+
   path_interval = datetime.datetime.now().strftime('interval_%Y%m%d-%H%M%S.csv')
 
   # Generate temporary file
@@ -173,9 +183,14 @@ def process(source):
 
 
 def main():
-  if (argc != 2):
-    print('Usage: # python3 %s source' % argvs[0])
+  global filter
+
+  if (argc < 2):
+    print('Usage: # python3 %s source (filter)' % argvs[0])
     quit()
+
+  if (argc >= 3): 
+    filter = argvs[2]
 
   process(argvs[1])
 
