@@ -27,7 +27,6 @@ import rosbag2_py  # noqa
 #%matplotlib inline
 import pandas as pd
 import matplotlib.pyplot as plot
-from matplotlib.ticker import MultipleLocator
 
 argvs = sys.argv
 argc = len(argvs)
@@ -54,7 +53,6 @@ def draw_line_graph(path, x_axis, y_axes=None):
   plot.minorticks_on()
   plot.grid(which="major", color="gray", linestyle="solid")
   plot.grid(which="minor", color="lightgray", linestyle="dotted")
-  #plot.gcf().axes[0].xaxis.set_minor_locator(MultipleLocator(1))
 
   plot.ylabel('DegC')
   plot.show()
