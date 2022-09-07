@@ -24,6 +24,11 @@ from rclpy.serialization import deserialize_message
 from rosidl_runtime_py.utilities import get_message
 import rosbag2_py  # noqa
 
+#%matplotlib inline
+import pandas as pd
+import matplotlib.pyplot as plot
+from matplotlib.ticker import MultipleLocator
+
 argvs = sys.argv
 argc = len(argvs)
 filter = None
@@ -39,12 +44,30 @@ def get_rosbag_options(path, serialization_format='cdr'):
   return storage_options, converter_options
 
 
+def draw_line_graph(path, x_axis, y_axes=None):
+  df = pd.read_csv(path)
+  filter = [x_axis] + y_axes
+
+  title = os.path.basename(path)
+  df[filter].plot(x=x_axis, title=title, grid=True, rot=90, figsize=(6, 4))
+
+  plot.minorticks_on()
+  plot.grid(which="major", color="gray", linestyle="solid")
+  plot.grid(which="minor", color="lightgray", linestyle="dotted")
+  #plot.gcf().axes[0].xaxis.set_minor_locator(MultipleLocator(1))
+
+  plot.ylabel('DegC')
+  plot.show()
+
+
 interval = {}
 intervals = {}
+temperatures = {}
 
 def write_topic(f, type_map, topic, data, ts):
   global interval
   global intervals
+  global temperatures
 
   if topic != '/diagnostics' and topic != '/system/emergency/hazard_status':
     return
@@ -87,6 +110,14 @@ def write_topic(f, type_map, topic, data, ts):
         intervals[status.name] = []
 
       interval[status.name] = ts
+      
+      if status.name == 'gpu_monitor: GPU Temperature':
+        value = status.values[0].value.rstrip('DegC')
+        try:
+          float(value)
+        except ValueError:
+          value = 0
+        temperatures[date.strip('\'')[10:19]] = value
 
   elif topic == '/system/emergency/hazard_status':
     lf_value = ""
@@ -118,6 +149,7 @@ def process(source):
   path = path + '.csv'
 
   path_interval = datetime.datetime.now().strftime('interval_%Y%m%d-%H%M%S.csv')
+  path_graph = datetime.datetime.now().strftime('graph_%Y%m%d-%H%M%S.csv')
 
   # Generate temporary file
   with open("tmp.csv", mode='w') as f:
@@ -181,9 +213,16 @@ def process(source):
     for key, value in intervals.items():
       w.write('{},{:.03f},{:.03f},{:.03f}\n'.format(key, sum(value)/len(value), min(value), max(value)))
 
+  with open(path_graph, mode='w') as w:
+    w.write('time,GPU Temperature\n')
+    for key, value in temperatures.items():
+      w.write('{},{}\n'.format(key, value))
+      
+  draw_line_graph(path_graph, 'time', ['GPU Temperature'])
 
 def main():
   global filter
+  global temperatures
 
   if (argc < 2):
     print('Usage: # python3 %s source (filter)' % argvs[0])
