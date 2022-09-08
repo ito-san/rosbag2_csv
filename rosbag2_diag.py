@@ -74,8 +74,8 @@ def write_topic(f, type_map, topic, data, ts):
   date = '\'{}.{:0>9}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
 
   # Deserialize topic
-  msg_type = get_message(type_map[topic])
   try:
+    msg_type = get_message(type_map[topic])
     msg = deserialize_message(data, msg_type)
   except Exception as e:
     print(e)
