@@ -78,22 +78,27 @@ def write_topic(f, type_map, topic, data, ts):
       interval[status.name] = ts
 
   elif topic == '/system/emergency/hazard_status':
+    sf_value = ""
     lf_value = ""
     spf_value = ""
     if type_map[topic] == 'autoware_auto_system_msgs/msg/HazardStatusStamped':
       #for Autoware.universe
+      for sf in msg.status.diag_safe_fault:
+          sf_value += '{:d}|{}|'.format(sf.level, sf.name, sf.message)
       for lf in msg.status.diag_latent_fault:
-        lf_value += '{}|{}|'.format(lf.level, lf.name, lf.message)
+          lf_value += '{:d}|{}|'.format(lf.level, lf.name, lf.message)
       for spf in msg.status.diag_single_point_fault:
-        spf_value += '{}|{}|'.format(spf.level, spf.name, spf.message)
+          spf_value += '{:d}|{}|'.format(spf.level, spf.name, spf.message)
     else:
       #for Autoware.IV
+      for sf in msg.status.diagnostics_sf:
+          sf_value  += '{}:{}{}|'.format(sf.level, sf.name, sf.message)
       for lf in msg.status.diagnostics_lf:
-        lf_value += '{}|{}|'.format(lf.level, lf.name, lf.message)
+          lf_value  += '{}:{}{}|'.format(lf.level, lf.name, lf.message)
       for spf in msg.status.diagnostics_spf:
-        spf_value += '{}|{}|'.format(spf.level, spf.name, spf.message)
+          spf_value += '{}:{}{}|'.format(spf.level, spf.name, spf.message)
 
-    f.write(',{},{},{},LF={},SPF={}\n'.format(date, topic, msg.status.level, lf_value, spf_value))
+    f.write(',{},{},{},SF={},LF={},SPF={}\n'.format(date, topic, msg.status.level, sf_value, lf_value, spf_value))
 
   else:
     f.write('\n')
