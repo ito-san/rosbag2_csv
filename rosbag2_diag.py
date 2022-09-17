@@ -26,6 +26,7 @@ import rosbag2_py  # noqa
 
 argvs = sys.argv
 argc = len(argvs)
+filter = None
 
 
 def get_rosbag_options(path, serialization_format='cdr'):
@@ -39,10 +40,11 @@ def get_rosbag_options(path, serialization_format='cdr'):
 
 
 interval = {}
-
+intervals = {}
 
 def write_topic(f, type_map, topic, data, ts):
   global interval
+  global intervals
 
   if topic != '/diagnostics' and topic != '/system/emergency/hazard_status':
     return
@@ -60,20 +62,29 @@ def write_topic(f, type_map, topic, data, ts):
 
   if topic == '/diagnostics':
     for status in msg.status:
+      # Filter by name
+      if filter is not None:
+        if status.name.startswith(filter) == False:
+          continue
+
       level = int.from_bytes(status.level, 'big')
       key_value = ""
-      # Append diagnotic array
+      # Append diagnostic array
       for value in status.values:
         key_value += '{},{},'.format(value.key, value.value)
 
       # If the topic already read
       if status.name in interval:
         # Write interval
-        f.write('{:.3f},'.format((ts - interval[status.name]) / 1000 / 1000 / 1000))
+        diff = (ts - interval[status.name]) / 1000 / 1000 / 1000
+        f.write('{:.03f},'.format(diff))
         f.write('{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
+        intervals[status.name].append(diff)
+
       else:
         f.write(',{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
         interval[status.name] = 0
+        intervals[status.name] = []
 
       interval[status.name] = ts
 
@@ -106,7 +117,12 @@ def write_topic(f, type_map, topic, data, ts):
 
 def process(source):
 
-  path = datetime.datetime.now().strftime('rosbag_%Y%m%d-%H%M%S.csv')
+  path = datetime.datetime.now().strftime('rosbag_%Y%m%d-%H%M%S')
+  if filter is not None:
+    path = path + "_" + filter
+  path = path + '.csv'
+
+  path_interval = datetime.datetime.now().strftime('interval_%Y%m%d-%H%M%S.csv')
 
   # Generate temporary file
   with open("tmp.csv", mode='w') as f:
@@ -149,10 +165,11 @@ def process(source):
 
   start_date = '{}.{}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(start / 1000 / 1000 / 1000)), start % (1000 * 1000 * 1000))
   end_date = '{}.{}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
+  delta = str(datetime.timedelta(seconds=(ts - start) / 1000 / 1000 / 1000))
 
   # Generate result
   with open(path, mode='w') as w:
-    w.write('start,{},end,{},duration,{:.3f},sec\n'.format(start_date, end_date, (ts - start) / 1000 / 1000 / 1000))
+    w.write('start,{},end,{},duration,{}\n'.format(start_date, end_date, delta))
     for file in files:
       w.write('{}\n'.format(file))
     w.write('interval,timestamp,topic,level,message\n')
@@ -162,11 +179,23 @@ def process(source):
 
     os.remove("tmp.csv")
 
+  # Generate intervals
+  with open(path_interval, mode='w') as w:
+    w.write('duration,{}\n'.format(delta))
+    w.write('topic,average,min,max\n')
+    for key, value in intervals.items():
+      w.write('{},{:.03f},{:.03f},{:.03f}\n'.format(key, sum(value)/len(value), min(value), max(value)))
+
 
 def main():
-  if (argc != 2):
-    print('Usage: # python3 %s source' % argvs[0])
+  global filter
+
+  if (argc < 2):
+    print('Usage: # python3 %s source (filter)' % argvs[0])
     quit()
+
+  if (argc >= 3): 
+    filter = argvs[2]
 
   process(argvs[1])
 
