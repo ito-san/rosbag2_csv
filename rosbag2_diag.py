@@ -60,7 +60,7 @@ def write_topic(f, type_map, topic, data, ts):
 
   if topic == '/diagnostics':
     for status in msg.status:
-      level = int.from_bytes(status.level, 'big')
+      level = int.from_bytes(status.level, 'little')
       key_value = ""
       # Append diagnotic array
       for value in status.values:
@@ -82,21 +82,21 @@ def write_topic(f, type_map, topic, data, ts):
     lf_value = ""
     spf_value = ""
     if type_map[topic] == 'autoware_auto_system_msgs/msg/HazardStatusStamped':
-      #for Autoware.universe
-      for sf in msg.status.diag_safe_fault:
-          sf_value += '{:d}|{}|'.format(sf.level, sf.name, sf.message)
-      for lf in msg.status.diag_latent_fault:
-          lf_value += '{:d}|{}|'.format(lf.level, lf.name, lf.message)
-      for spf in msg.status.diag_single_point_fault:
-          spf_value += '{:d}|{}|'.format(spf.level, spf.name, spf.message)
+      #DiagStatus for Autoware.universe
+      for ds in msg.status.diag_safe_fault:
+          sf_value  += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
+      for ds in msg.status.diag_latent_fault:
+          lf_value  += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
+      for ds in msg.status.diag_single_point_fault:
+          spf_value += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
     else:
-      #for Autoware.IV
-      for sf in msg.status.diagnostics_sf:
-          sf_value  += '{}:{}{}|'.format(sf.level, sf.name, sf.message)
-      for lf in msg.status.diagnostics_lf:
-          lf_value  += '{}:{}{}|'.format(lf.level, lf.name, lf.message)
-      for spf in msg.status.diagnostics_spf:
-          spf_value += '{}:{}{}|'.format(spf.level, spf.name, spf.message)
+      #DiagStatus for Autoware.IV
+      for ds in msg.status.diagnostics_sf:
+          sf_value  += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
+      for ds in msg.status.diagnostics_lf:
+          lf_value  += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
+      for ds in msg.status.diagnostics_spf:
+          spf_value += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
 
     f.write(',{},{},{},SF={},LF={},SPF={}\n'.format(date, topic, msg.status.level, sf_value, lf_value, spf_value))
 
@@ -152,7 +152,8 @@ def process(source):
 
   # Generate result
   with open(path, mode='w') as w:
-    w.write('start,{},end,{},duration,{:.3f},sec\n'.format(start_date, end_date, (ts - start) / 1000 / 1000 / 1000))
+    w.write('start,{},end,{},duration,{:.3f},sec'.format(start_date, end_date, (ts - start) / 1000 / 1000 / 1000))
+    w.write(',\"Caution:Timestamp timezone is converting timezone not recording timezone!\"\n')
     for file in files:
       w.write('{}\n'.format(file))
     w.write('interval,timestamp,topic,level,message\n')
