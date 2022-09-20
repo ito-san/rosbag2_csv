@@ -42,7 +42,7 @@ def get_rosbag_options(path, serialization_format='cdr'):
 interval = {}
 intervals = {}
 
-def write_topic(f, type_map, topic, data, ts):
+def write_topic(csv_f, topic_type, topic, data, ts):
   global interval
   global intervals
 
@@ -53,7 +53,7 @@ def write_topic(f, type_map, topic, data, ts):
   date = '\'{}.{:0>9}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
 
   # Deserialize topic
-  msg_type = get_message(type_map[topic])
+  msg_type = get_message(topic_type)
   try:
     msg = deserialize_message(data, msg_type)
   except Exception as e:
@@ -77,12 +77,12 @@ def write_topic(f, type_map, topic, data, ts):
       if status.name in interval:
         # Write interval
         diff = (ts - interval[status.name]) / 1000 / 1000 / 1000
-        f.write('{:.03f},'.format(diff))
-        f.write('{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
+        csv_f.write('{:.03f},'.format(diff))
+        csv_f.write('{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
         intervals[status.name].append(diff)
 
       else:
-        f.write(',{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
+        csv_f.write(',{},{},{},{},{}\n'.format(date, status.name, level, status.message, key_value))
         interval[status.name] = 0
         intervals[status.name] = []
 
@@ -92,7 +92,7 @@ def write_topic(f, type_map, topic, data, ts):
     sf_value = ""
     lf_value = ""
     spf_value = ""
-    if type_map[topic] == 'autoware_auto_system_msgs/msg/HazardStatusStamped':
+    if topic_type == 'autoware_auto_system_msgs/msg/HazardStatusStamped':
       #DiagStatus for Autoware.universe
       for ds in msg.status.diag_safe_fault:
           sf_value  += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
@@ -109,10 +109,10 @@ def write_topic(f, type_map, topic, data, ts):
       for ds in msg.status.diagnostics_spf:
           spf_value += '{:d}:{}:{}|'.format(int.from_bytes(ds.level,'little'), ds.name, ds.message)
 
-    f.write(',{},{},{},SF={},LF={},SPF={}\n'.format(date, topic, msg.status.level, sf_value, lf_value, spf_value))
+    csv_f.write(',{},{},{},SF={},LF={},SPF={}\n'.format(date, topic, msg.status.level, sf_value, lf_value, spf_value))
 
   else:
-    f.write('\n')
+    csv_f.write('\n')
 
 
 def process(source):
@@ -125,7 +125,7 @@ def process(source):
   path_interval = datetime.datetime.now().strftime('interval_%Y%m%d-%H%M%S.csv')
 
   # Generate temporary file
-  with open("tmp.csv", mode='w') as f:
+  with open("tmp.csv", mode='w') as wr_f:
 
     start = 0
     ts = 0
@@ -147,21 +147,23 @@ def process(source):
       except Exception as e:
         print(e)
         continue
+      print('rosbag2 Reader opened. ', end="")
 
-      topic_types = reader.get_all_topics_and_types()
+      topic_list = reader.get_all_topics_and_types()
 
       # Create a map for quicker lookup
-      type_map = {topic_types[i].name: topic_types[i].type for i in range(len(topic_types))}
+      topic_dict = {topic_list[i].name: topic_list[i] for i in range(len(topic_list))}
 
+      print('reading Topic Records!')
       if reader.has_next():
         (topic, data, ts) = reader.read_next()
         if start == 0:
           start = ts
-        write_topic(f, type_map, topic, data, ts)
+        write_topic(wr_f, topic_dict[topic].type, topic, data, ts)
 
       while reader.has_next():
         (topic, data, ts) = reader.read_next()
-        write_topic(f, type_map, topic, data, ts)
+        write_topic(wr_f, topic_dict[topic].type, topic, data, ts)
 
   start_date = '{}.{}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(start / 1000 / 1000 / 1000)), start % (1000 * 1000 * 1000))
   end_date = '{}.{}'.format(time.strftime('%Y/%m/%d %H:%M:%S', time.localtime(ts / 1000 / 1000 / 1000)), ts % (1000 * 1000 * 1000))
@@ -179,6 +181,7 @@ def process(source):
       w.write(r.read())
 
     os.remove("tmp.csv")
+    print('created {}'.format(path))
 
   # Generate intervals
   with open(path_interval, mode='w') as w:
